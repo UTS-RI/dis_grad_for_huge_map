@@ -16,6 +16,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 #set(OpenVDB_DIR "/usr/local/lib/cmake/OpenVDB")
 list(APPEND CMAKE_MODULE_PATH "/usr/local/lib/cmake/OpenVDB")
@@ -42,7 +43,7 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME})
 
 add_executable(listener src/subscriber_member_function.cpp)
-ament_target_dependencies(listener rclcpp std_msgs rclcpp sensor_msgs pcl_conversions PCL)
+ament_target_dependencies(listener rclcpp std_msgs rclcpp sensor_msgs pcl_conversions PCL visualization_msgs)
 
 install(TARGETS
   talker
