@@ -162,7 +162,7 @@ public:
 
 
     // generate a queyring cube in the space
-    int interval = 1000;
+    int interval = 1000; // make this interval as 100 or 200 to have the full distance field and gradients
     std::vector<Eigen::Vector3d> voxelsToUpdate;
     for(double xIdx = -30000; xIdx < 30000; xIdx = xIdx + interval){
       for(double zIdx = -30000; zIdx < 30000; zIdx = zIdx + interval){
@@ -249,9 +249,12 @@ public:
 
     // Compute the gradient at each voxel using central difference
     // put the gradient in the grid
+    int indexall = 1;
+    visualization_msgs::msg::MarkerArray mArray;
     for (int xIdx = -30000; xIdx < 30000; xIdx += interval) {
       for (int zIdx = -30000; zIdx < 30000; zIdx += interval) {
           for (int yIdx = -2000; yIdx < 9000; yIdx += interval) {
+              
               // Use central difference for gradient approximation
               openvdb::math::Vec3d centerPoint(xIdx,yIdx,zIdx);
               openvdb::math::Vec3d centerPointI = xformd.worldToIndex(centerPoint);
@@ -287,15 +290,43 @@ public:
               float dz = (dis_grid_acc.getValue(voxel5) - dis_grid_acc.getValue(voxel6)) / 2*interval;
 
               // Store the gradient in Eigen format
+              double gradLen = sqrt(dx*dx + dy*dy + dz*dz); 
+    
+              if(gradLen != 0){
+                  dx/=gradLen;
+                  dy/=gradLen;
+                  dz/=gradLen;
+              } else {
+                  dx=0;
+                  dy=0;
+                  dz=0;
+              }
               openvdb::Vec3f gradient(dx, dy, dz);
               grd_grid_acc.setValue(voxel0, gradient);
               
               // Optionally, print the gradient for debugging
-              std::cout << "Gradient at (" << xIdx << ", " << yIdx << ", " << zIdx << ") : (" 
-                        << gradient.x() << ", " << gradient.y() << ", " << gradient.z() << ")" << std::endl;
+              // std::cout << "Distance and Gradient at (" << xIdx << ", " << yIdx << ", " << zIdx << ") : (" 
+              //           << gradient.x() << ", " << gradient.y() << ", " << gradient.z() << ") (" 
+              //           << dis_grid_acc.getValue(voxel0) << ")" << std::endl;
+
+              // if you dont care about magnitude, normalize the gradient vector (looks better)
+              geometry_msgs::msg::Point start;
+              start.x = xIdx; 
+              start.y = yIdx; 
+              start.z = zIdx;
+              float vecLen1 = 1000; // scales the vector to 1000 ASSUMING it was normalized before
+              geometry_msgs::msg::Point end;
+              end.x = start.x + dx*vecLen1; 
+              end.y = start.y + dy*vecLen1; 
+              end.z = start.z + dz*vecLen1;
+              float colorGra[] = {0,1,1,1}; // RGBA. Calculate a colormap based on distance to color it according to distance field 
+              mArray.markers.push_back(create_arrow(200, start, end, indexall, colorGra));
+
+              indexall ++;
           }
       }
-  }
+    } 
+    globalQueryPointsGrd_pub_->publish(mArray);
 
     // Create a VDB file
     openvdb::io::File file1("raw_grid.vdb");
@@ -339,6 +370,7 @@ private:
     RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg.data.c_str());
   }
   
+  // this function is used if we have service for outside query
   void visualQueriedDistances(const std::vector<float> queryPoints, const std::vector<double> pRes){
     pcl::PointCloud<pcl::PointXYZI> queryPointsPCL;
     int N_pts = queryPoints.size()/3;
@@ -364,6 +396,7 @@ private:
     globalQueryPointsDis_pub_->publish(*map_msg_ptr);
   }
 
+  // this function is used if we have service for outside query
   void visualQueriedGradients(const std::vector<float> queryPoints, const std::vector<double> pRes){
     visualization_msgs::msg::MarkerArray mArray;
     int N_pts = queryPoints.size()/3;
@@ -385,7 +418,7 @@ private:
     }
     globalQueryPointsGrd_pub_->publish(mArray);
   }
-
+ 
   visualization_msgs::msg::Marker create_arrow(float scale, 
       const geometry_msgs::msg::Point &start, 
       const geometry_msgs::msg::Point &end, 
@@ -404,9 +437,9 @@ private:
     m.pose.orientation.z = 0;
     m.pose.orientation.w = 1;
 
-    m.scale.x = scale;       // Thickness of the arrow shaft
-    m.scale.y = scale * 2;   // Thickness of the base
-    m.scale.z = 0.1;         // Arrowhead scale
+    m.scale.x = scale*1.0;       // Thickness of the arrow shaft
+    m.scale.y = scale*2.0;   // Thickness of the base
+    m.scale.z = scale*0.5;         // Arrowhead scale
 
     // Set color
     m.color.r = color[0];
