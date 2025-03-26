@@ -19,6 +19,7 @@
 #include "std_msgs/msg/string.hpp"
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include "visualization_msgs/msg/marker_array.hpp"
+#include "edf_srv/srv/query_edf.hpp"
 
 #include <pcl/io/ply_io.h>
 #include <pcl/point_types.h>
@@ -50,6 +51,7 @@
 #include "OnGPDF.h"
 
 using std::placeholders::_1;
+using std::placeholders::_2;
   
 class MinimalSubscriber : public rclcpp::Node
 {
@@ -57,8 +59,8 @@ public:
   MinimalSubscriber()
   : Node("minimal_subscriber")
   {
-    subscription_ = this->create_subscription<std_msgs::msg::String>(
-      "topic", 10, std::bind(&MinimalSubscriber::topic_callback, this, _1));
+    // subscription_ = this->create_subscription<std_msgs::msg::String>(
+    //   "topic", 10, std::bind(&MinimalSubscriber::topic_callback, this, _1));
 
     publisherIn_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("point_cloud_in", 10);
     publisherOut_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("point_cloud_out", 10);
@@ -67,7 +69,7 @@ public:
     globalQueryPointsGrd_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("grd_out", 10);
 
     //std::string file_path = "/home/lan/Downloads/sydney_harbour_shrink_z.ply";  // Change this to your PLY file path
-    std::string file_path = "/home/lan/Downloads/SydneyHarbourSubmapMesh.ply";  // Change this to your PLY file path
+    std::string file_path = "/home/jen/Downloads/SydneyHarbourSubmapMesh.ply";  // Change this to your PLY file path
 
     pcl::PointCloud<pcl::PointXYZ> cloud;
     pcl::PointCloud<pcl::PointXYZ> cloud_out;
@@ -89,7 +91,7 @@ public:
     raw_grid_ = openvdb::FloatGrid::create(-100); // default value for each voxel
     raw_grid_->setName("R(x): point cloud grid");
     raw_grid_->setTransform(
-      openvdb::math::Transform::createLinearTransform(100));
+      openvdb::math::Transform::createLinearTransform(100)); // voxel size 100 units
     raw_grid_->setGridClass(openvdb::GRID_LEVEL_SET);
     
     // not used
@@ -109,7 +111,7 @@ public:
     grd_grid_->setGridClass(openvdb::GRID_UNKNOWN);
 
     // Get the transform and the "unsafe" version of the grid accessors
-    const openvdb::math::Transform &xformr = raw_grid_->transform();
+    const openvdb::math::Transform &xformr = raw_grid_->transform(); //xformr is a reference to the transform
     auto raw_grid_acc = raw_grid_->getUnsafeAccessor();
 
     // Get the transform and the "unsafe" version of the grid accessors
@@ -125,7 +127,8 @@ public:
     {
         pcl::PointXYZ& point = cloud.points[i];
         // access point coordinates
-        openvdb::Vec3d voxeltemp(point.x,point.y,point.z); 
+        openvdb::Vec3d voxeltemp(point.x,point.y,point.z);
+        // stores them in voxel indexed according to the raw grid transformation ?
         voxeltemp = xformr.worldToIndex(voxeltemp);
         openvdb::math::Coord localPoint(voxeltemp.x(),voxeltemp.y(),voxeltemp.z()); 
         raw_grid_acc.setValue(localPoint, 1.0);
@@ -140,6 +143,7 @@ public:
       auto leaf = iterL.getLeaf();
       
       for (auto iterLV = leaf->beginValueOn(); iterLV; ++iterLV){
+        // reverses the transformation back to world frame ?
         auto iterValueOnWorld = xformr.indexToWorld(iterLV.getCoord());
         pcl::PointXYZ pt;
         pt.x = static_cast<float>(iterValueOnWorld.x());
@@ -147,13 +151,15 @@ public:
         pt.z = static_cast<float>(iterValueOnWorld.z());
         cloud_out.push_back(pt);
         Eigen::Vector3d tmp123(iterValueOnWorld.x(),iterValueOnWorld.y(),iterValueOnWorld.z());
+        // stores world frame points also in this vector of Vector3ds
         leafVoxels.push_back(tmp123);
         //std::cout << "leafVoxels: " << iterValueOnWorld.x() << ";" << iterValueOnWorld.y() << ";" << iterValueOnWorld.z() << std::endl;
       }
     }
     std::cout << "cloud_in_vdb: " << cloud_out.size() << std::endl;
     //std::cout << "numberLeaf: " << numberLeaf << std::endl;
-
+    
+    // publish un-transformed point cloud
     sensor_msgs::msg::PointCloud2 ros_cloud_out;
     pcl::toROSMsg(cloud_out, ros_cloud_out);
     ros_cloud_out.header.frame_id = "map";
@@ -168,6 +174,7 @@ public:
       for(double zIdx = -30000; zIdx < 30000; zIdx = zIdx + interval){
         for(double yIdx = -2000; yIdx < 9000; yIdx = yIdx + interval){
           Eigen::Vector3d tmp(xIdx,yIdx,zIdx);
+          // vector of query points in world coordinates
           voxelsToUpdate.push_back(tmp);
         }
       }
@@ -180,20 +187,22 @@ public:
 
     for (size_t testIdx = 0; testIdx < voxelsToUpdate_size; testIdx = testIdx+1) {
       pcl::PointXYZ pt;
+      // query points in world coords but in kilometres rather than metres
       pt.x = static_cast<float>(voxelsToUpdate[testIdx].x()* scale_factor);
       pt.y = static_cast<float>(voxelsToUpdate[testIdx].y()* scale_factor);
       pt.z = static_cast<float>(voxelsToUpdate[testIdx].z()* scale_factor);
       cloudS->push_back(pt);
     }
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloudT(new pcl::PointCloud<pcl::PointXYZ>);
+    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloudT_ = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
     size_t leafVoxels_size = leafVoxels.size();
     for (size_t targetIdx = 0; targetIdx < leafVoxels_size; targetIdx++) {
       pcl::PointXYZ pt;
+      // gt points in world frame also in kilometres
       pt.x = static_cast<float>(leafVoxels[targetIdx].x()* scale_factor);
       pt.y = static_cast<float>(leafVoxels[targetIdx].y()* scale_factor);
       pt.z = static_cast<float>(leafVoxels[targetIdx].z()* scale_factor);
-      cloudT->push_back(pt);
+      cloudT_->push_back(pt);
     }
 
     //std::vector<int> indicesKD;
@@ -203,16 +212,20 @@ public:
     std::vector<int> indicesKD(voxelsToUpdate.size(), -1);
     std::vector<float> distancesKD(voxelsToUpdate.size(), std::numeric_limits<float>::max());
 
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
-    kdtree->setInputCloud(cloudT);
+    // make the kd tree from gt points
+    std::shared_ptr<pcl::search::KdTree<pcl::PointXYZ>> kdtree_ = std::make_shared<pcl::search::KdTree<pcl::PointXYZ>>();
+    // pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
+    kdtree_->setInputCloud(cloudT_);
 
+    // iterate through query points
     for (size_t idxSource = 0; idxSource < voxelsToUpdate_size; idxSource++)
     {
       std::vector<int> pointIdxNKNSearch;
       std::vector<float> pointNKNSquaredDistance;
-      if (kdtree->nearestKSearch(cloudS->points[idxSource], knne, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
+      if (kdtree_->nearestKSearch(cloudS->points[idxSource], knne, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
       {
         indicesKD[idxSource] = pointIdxNKNSearch[0];
+        // store distances in metres again
         distancesKD[idxSource] = std::sqrt(pointNKNSquaredDistance[0])/ scale_factor;
       }
     }
@@ -362,28 +375,115 @@ public:
     file3.close();
 
     std::cout << "Saved all VDB files: raw_grid.vdb, dis_grid.vdb, grd_grid.vdb" << std::endl;
+    
+    // Start service
+    query_edf_srv_ = this->create_service<edf_srv::srv::QueryEdf>("edf_srv", 
+                                                                  std::bind(&MinimalSubscriber::queryEDF_callback, this, _1,_2));
   }
 
 private:
-  void topic_callback(const std_msgs::msg::String & msg) const
-  {
-    RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg.data.c_str());
+  // void topic_callback(const std_msgs::msg::String & msg) const
+  // {
+  //   RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg.data.c_str());
+  // }
+  std::shared_ptr<pcl::search::KdTree<pcl::PointXYZ>> kdtree_;
+  std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloudT_;
+
+  void queryEDF_callback(
+    const std::shared_ptr<edf_srv::srv::QueryEdf::Request> reqQ,
+    std::shared_ptr<edf_srv::srv::QueryEdf::Response> resS) {
+      
+      std::vector<float> queryPoints(reqQ->points.begin(), reqQ->points.end());
+      if (queryPoints.empty()) {
+        std::cerr << "Query is empty, check again!\n";
+      }
+      
+      auto validNumberTest = queryPoints.size()%3;
+      if (validNumberTest != 0) {
+        std::cerr << "Query is wrong size, make sure input is (x,y,z) coordinates!\n";
+      }
+
+      if (!cloudT_ || cloudT_->empty()) {
+        std::cerr << "KD point cloud is empty!\n";
+      }
+
+      if (!kdtree_) {
+        std::cerr << "KDTree empty or uninitialised!\n";
+      }
+
+    int knne = 1; 
+    int N_pts = queryPoints.size() / 3;
+    
+    resS->distances.resize(N_pts,0);
+    resS->gradients.resize(N_pts*3,0);
+
+    std::vector<int> indicesKD(N_pts, -1);
+    std::vector<float> distancesKD(N_pts, std::numeric_limits<float>::max());
+
+    // iterate through query points
+    for (int idxSource = 0; idxSource < N_pts; idxSource++)
+    {
+      std::vector<int> pointIdxNKNSearch;
+      std::vector<float> pointNKNSquaredDistance;
+      std::vector<float> q_pt_grads;
+      pcl::PointXYZ q_pt(reqQ->points[(idxSource*3)],reqQ->points[(idxSource*3)+1],reqQ->points[(idxSource*3)+2]);
+      double scale_factor = 0.001;
+      if (kdtree_->nearestKSearch(q_pt, knne, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
+      {
+        int dx = 100;
+        calculateNumericalGrad(q_pt, kdtree_, dx, q_pt_grads);
+        resS->distances[idxSource] = std::sqrt(pointNKNSquaredDistance[0])/ scale_factor;
+        resS->gradients[idxSource*3] = q_pt_grads[0];
+        resS->gradients[(idxSource*3)+1] = q_pt_grads[1];
+        resS->gradients[(idxSource*3)+2] = q_pt_grads[2];
+      }
+      else {
+        std::cerr << "Could not find any nearest neighbours\n";
+      }
+    }
+    visualQueriedDistances(queryPoints,resS->distances);
+    visualQueriedGradients(queryPoints,resS->gradients);
+    }
+
+  void calculateNumericalGrad(const pcl::PointXYZ queryPoint, const std::shared_ptr<pcl::search::KdTree<pcl::PointXYZ>> kdtree, const int dx, std::vector<float> &grad){
+    std::vector<pcl::PointXYZ> diff_points;
+    diff_points.push_back(pcl::PointXYZ(queryPoint.x + dx, queryPoint.y, queryPoint.z));
+    diff_points.push_back(pcl::PointXYZ(queryPoint.x - dx, queryPoint.y, queryPoint.z));
+    diff_points.push_back(pcl::PointXYZ(queryPoint.x, queryPoint.y + dx, queryPoint.z));
+    diff_points.push_back(pcl::PointXYZ(queryPoint.x, queryPoint.y - dx, queryPoint.z));
+    diff_points.push_back(pcl::PointXYZ(queryPoint.x, queryPoint.y, queryPoint.z + dx));
+    diff_points.push_back(pcl::PointXYZ(queryPoint.x, queryPoint.y, queryPoint.z - dx));
+    int knne = 1;
+    double scale_factor = 0.001;
+    grad.resize(3);
+
+    for (int idx = 0; idx < 3; idx++) {
+      std::vector<int> plusPointIdxNKNSearch;
+      std::vector<float> plusPointNKNSquaredDistance;
+      std::vector<int> minusPointIdxNKNSearch;
+      std::vector<float> minusPointNKNSquaredDistance;
+      kdtree->nearestKSearch(diff_points[idx*2], knne, plusPointIdxNKNSearch, plusPointNKNSquaredDistance);
+      kdtree->nearestKSearch(diff_points[idx*2+1], knne, minusPointIdxNKNSearch, minusPointNKNSquaredDistance);
+      float dis_plus = std::sqrt(plusPointNKNSquaredDistance[0]) / scale_factor;
+      float dis_minus = std::sqrt(minusPointNKNSquaredDistance[0]) / scale_factor;
+      grad[idx] = static_cast<float>((dis_plus - dis_minus) / (2 * dx));
+    }
   }
   
   // this function is used if we have service for outside query
   void visualQueriedDistances(const std::vector<float> queryPoints, const std::vector<double> pRes){
     pcl::PointCloud<pcl::PointXYZI> queryPointsPCL;
     int N_pts = queryPoints.size()/3;
-    for (size_t ii = 0; ii < N_pts; ii++) {
+    for (int ii = 0; ii < N_pts; ii++) {
       int k3 = ii * 3;
-      int k8 = ii * 8;
+      // int k8 = ii * 8;
       pcl::PointXYZI pt;
       pt.x = static_cast<float>(queryPoints[k3]);
       pt.y = static_cast<float>(queryPoints[k3+1]);
       pt.z = static_cast<float>(queryPoints[k3+2]);
       //pt.z = static_cast<float>(pRes[k8]+0.9);
-      pt.intensity = static_cast<float>(pRes[k8]);
-      if(pRes[k8]<=0){ // skip points with bad distance
+      pt.intensity = static_cast<float>(pRes[ii]);
+      if(pRes[ii]<=0){ // skip points with bad distance
         continue;
       }else{
         queryPointsPCL.push_back(pt);
@@ -410,9 +510,9 @@ private:
         start.z = queryPoints[k3+2];
         float vecLen1 = 0.4; // scales the vector to 40cm ASSUMING it was normalized before
         geometry_msgs::msg::Point end;
-        end.x = start.x + pRes[k8+1]*vecLen1; 
-        end.y = start.y + pRes[k8+2]*vecLen1; 
-        end.z = start.z + pRes[k8+3]*vecLen1;
+        end.x = start.x + pRes[k3]*vecLen1; 
+        end.y = start.y + pRes[k3+1]*vecLen1; 
+        end.z = start.z + pRes[k3+2]*vecLen1;
         float colorGra[] = {0,1,1,1}; // RGBA. Calculate a colormap based on distance to color it according to distance field 
         mArray.markers.push_back(create_arrow(0.04, start, end, idx, colorGra));
     }
@@ -454,7 +554,7 @@ private:
     return m;
   }
 
-  // publishers ad subscribers
+  // publishers ad subscribers and server
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisherIn_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisherOut_;
@@ -462,10 +562,14 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr globalQueryPointsDis_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr globalQueryPointsGrd_pub_;
 
+  rclcpp::Service<edf_srv::srv::QueryEdf>::SharedPtr query_edf_srv_;
+
   // OpenVDB Grids to store the point cloud
   openvdb::FloatGrid::Ptr raw_grid_;
   openvdb::FloatGrid::Ptr dis_grid_;
   openvdb::Vec3fGrid::Ptr grd_grid_;
+
+  
 };
 
 int main(int argc, char * argv[])
