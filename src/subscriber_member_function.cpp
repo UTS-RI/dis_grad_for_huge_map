@@ -68,6 +68,8 @@ public:
     globalQueryPointsDis_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("dis_out", 10);
     globalQueryPointsGrd_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("grd_out", 10);
 
+    // timer_ = this->create_wall_timer(std::chrono::milliseconds(1000), std::bind(&MinimalSubscriber::timer_callback, this));
+
     //std::string file_path = "/home/lan/Downloads/sydney_harbour_shrink_z.ply";  // Change this to your PLY file path
     std::string file_path = "/home/jen/Downloads/SydneyHarbourSubmapMesh.ply";  // Change this to your PLY file path
 
@@ -194,7 +196,7 @@ public:
       cloudS->push_back(pt);
     }
 
-    std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloudT_ = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+    cloudT_ = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
     size_t leafVoxels_size = leafVoxels.size();
     for (size_t targetIdx = 0; targetIdx < leafVoxels_size; targetIdx++) {
       pcl::PointXYZ pt;
@@ -213,7 +215,7 @@ public:
     std::vector<float> distancesKD(voxelsToUpdate.size(), std::numeric_limits<float>::max());
 
     // make the kd tree from gt points
-    std::shared_ptr<pcl::search::KdTree<pcl::PointXYZ>> kdtree_ = std::make_shared<pcl::search::KdTree<pcl::PointXYZ>>();
+    kdtree_ = std::make_shared<pcl::search::KdTree<pcl::PointXYZ>>();
     // pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
     kdtree_->setInputCloud(cloudT_);
 
@@ -382,12 +384,15 @@ public:
   }
 
 private:
-  // void topic_callback(const std_msgs::msg::String & msg) const
-  // {
-  //   RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg.data.c_str());
-  // }
   std::shared_ptr<pcl::search::KdTree<pcl::PointXYZ>> kdtree_;
   std::shared_ptr<pcl::PointCloud<pcl::PointXYZ>> cloudT_;
+
+  // void timer_callback() {
+  //   sensor_msgs::msg::PointCloud2::Ptr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
+  //   pcl::toROSMsg(*cloudT_, *map_msg_ptr);
+  //   map_msg_ptr->header.frame_id = "map";
+  //   globalQueryPointsDis_pub_->publish(*map_msg_ptr);
+  // }
 
   void queryEDF_callback(
     const std::shared_ptr<edf_srv::srv::QueryEdf::Request> reqQ,
@@ -563,6 +568,8 @@ private:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr globalQueryPointsGrd_pub_;
 
   rclcpp::Service<edf_srv::srv::QueryEdf>::SharedPtr query_edf_srv_;
+
+  rclcpp::TimerBase::SharedPtr timer_;
 
   // OpenVDB Grids to store the point cloud
   openvdb::FloatGrid::Ptr raw_grid_;
