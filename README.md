@@ -14,11 +14,16 @@ Start the ROS2 node with:
 ```
 ros2 run edf_map edf_service
 ```
-Query the distance and direction to the closest obstacle with:
+Query the distance and direction to the closest obstacle at a point with:
 ```
 ros2 service call /edf_srv edf_srv/srv/QueryEdf "{points: [x1,y1,z1,x2,y2,z2,...,xN,yN,zN]}"
 ```
 where `x1,y1,z2, etc...` are the query locations you are interested in. The service will return a list of distances and gradients corresponding to your input.
+
+Query the entire distance field at a particular `z1` height with:
+```
+ros2 service call /slice_edf_srv edf_srv/srv/QueryEdfSlice "{z: z1}"
+```
 
 ### Topics
 
