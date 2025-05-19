@@ -36,19 +36,19 @@ find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIRS})
 include_directories(/usr/include/eigen3)
 
-add_executable(talker src/publisher_member_function.cpp)
-ament_target_dependencies(talker rclcpp std_msgs edf_srv)
+# add_executable(talker src/publisher_member_function.cpp)
+# ament_target_dependencies(talker rclcpp std_msgs edf_srv)
+
+# install(TARGETS
+#   talker
+#   DESTINATION lib/${PROJECT_NAME})
+
+add_executable(edf_service src/subscriber_member_function.cpp)
+ament_target_dependencies(edf_service rclcpp std_msgs rclcpp sensor_msgs pcl_conversions PCL visualization_msgs edf_srv)
 
 install(TARGETS
   talker
-  DESTINATION lib/${PROJECT_NAME})
-
-add_executable(sydney_edf_service src/subscriber_member_function.cpp)
-ament_target_dependencies(sydney_edf_service rclcpp std_msgs rclcpp sensor_msgs pcl_conversions PCL visualization_msgs edf_srv)
-
-install(TARGETS
-  talker
-  sydney_edf_service
+  edf_service
   DESTINATION lib/${PROJECT_NAME})
 
 # add_library(ongpdf_lib src/OnGPDF.cpp)
