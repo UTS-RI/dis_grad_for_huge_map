@@ -51,8 +51,7 @@ install(TARGETS
   sydney_edf_service
   DESTINATION lib/${PROJECT_NAME})
 
-
-add_library(ongpdf_lib src/OnGPDF.cpp)
-target_link_libraries(sydney_edf_service ${OpenVDB_LIBRARIES} ${catkin_LIBRARIES} ongpdf_lib)
+# add_library(ongpdf_lib src/OnGPDF.cpp)
+# target_link_libraries(listener ${OpenVDB_LIBRARIES} ${catkin_LIBRARIES} ongpdf_lib)
 
 ament_package()
