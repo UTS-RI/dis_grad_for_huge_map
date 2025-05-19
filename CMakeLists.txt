@@ -50,7 +50,7 @@ install(TARGETS
   listener
   DESTINATION lib/${PROJECT_NAME})
 
-add_library(ongpdf_lib src/OnGPDF.cpp)
-target_link_libraries(listener ${OpenVDB_LIBRARIES} ${catkin_LIBRARIES} ongpdf_lib)
+# add_library(ongpdf_lib src/OnGPDF.cpp)
+# target_link_libraries(listener ${OpenVDB_LIBRARIES} ${catkin_LIBRARIES} ongpdf_lib)
 
 ament_package()
