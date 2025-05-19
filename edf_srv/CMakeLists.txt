@@ -12,6 +12,7 @@ find_package(rclcpp REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
 	"srv/QueryEdf.srv"
+	"srv/QueryEdfSlice.srv"
 	)
 
 ament_export_dependencies(rosidl_default_runtime)
