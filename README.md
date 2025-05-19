@@ -4,9 +4,9 @@
 
 To install, first please install OpenVDB following these instructions: https://github.com/AcademySoftwareFoundation/openvdb
 
-After OpenVDB is installed,
+After OpenVDB is installed, clone the repo into your ROS2 workspace and re-build your workspace
 ```
-colcon build ros2_ws && source install/setup.bash
+colcon build <workspace_name> && source install/setup.bash
 ```
 ## Usage
 
