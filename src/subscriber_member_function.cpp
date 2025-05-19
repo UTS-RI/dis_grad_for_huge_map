@@ -20,6 +20,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include "visualization_msgs/msg/marker_array.hpp"
 #include "edf_srv/srv/query_edf.hpp"
+#include "edf_srv/srv/query_edf_slice.hpp"
 
 #include <pcl/io/ply_io.h>
 #include <pcl/point_types.h>
@@ -70,8 +71,7 @@ public:
 
     timer_ = this->create_wall_timer(std::chrono::milliseconds(1000), std::bind(&MinimalSubscriber::timer_callback, this));
 
-    //std::string file_path = "/home/lan/Downloads/sydney_harbour_shrink_z.ply";  // Change this to your PLY file path
-    std::string file_path = "/home/jen/Downloads/dupesyd.ply";  // Change this to your PLY file path
+    std::string file_path = "./src/dis_grad_for_huge_map/dupesyd.ply";  // Change this to your PLY file path
 
     pcl::PointCloud<pcl::PointXYZ> cloud;
     cloud_out_ = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
@@ -169,33 +169,33 @@ public:
     publisherOut_->publish(ros_cloud_out);
     
 
-
-    // generate a queyring cube in the space
-    int interval = 1000; // make this interval as 100 or 200 to have the full distance field and gradients
-    std::vector<Eigen::Vector3d> voxelsToUpdate;
-    for(double xIdx = -30000; xIdx < 30000; xIdx = xIdx + interval){
-      for(double yIdx = -30000; yIdx < 30000; yIdx = yIdx + interval){
-        for(double zIdx = -2000; zIdx < 9000; zIdx = zIdx + interval){
-          Eigen::Vector3d tmp(xIdx,yIdx,zIdx);
-          // vector of query points in world coordinates
-          voxelsToUpdate.push_back(tmp);
-        }
-      }
-    }
+    // for testing / sanity check only
+    // // generate a queyring cube in the space
+    // int interval = 1000; // make this interval as 100 or 200 to have the full distance field and gradients
+    // std::vector<Eigen::Vector3d> voxelsToUpdate;
+    // for(double xIdx = -30000; xIdx < 30000; xIdx = xIdx + interval){
+    //   for(double yIdx = -30000; yIdx < 30000; yIdx = yIdx + interval){
+    //     for(double zIdx = -2000; zIdx < 9000; zIdx = zIdx + interval){
+    //       Eigen::Vector3d tmp(xIdx,yIdx,zIdx);
+    //       // vector of query points in world coordinates
+    //       voxelsToUpdate.push_back(tmp);
+    //     }
+    //   }
+    // }
     
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloudS(new pcl::PointCloud<pcl::PointXYZ>);
-    size_t voxelsToUpdate_size = voxelsToUpdate.size();
-    // Scale factor to avoid floating-point precision issues
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloudS(new pcl::PointCloud<pcl::PointXYZ>);
+    // size_t voxelsToUpdate_size = voxelsToUpdate.size();
+    // // Scale factor to avoid floating-point precision issues
     double scale_factor = 1;  // Convert meters to kilometers (or adjust as needed)
 
-    for (size_t testIdx = 0; testIdx < voxelsToUpdate_size; testIdx = testIdx+1) {
-      pcl::PointXYZ pt;
-      // query points in world coords but in kilometres rather than metres
-      pt.x = static_cast<float>(voxelsToUpdate[testIdx].x()* scale_factor);
-      pt.y = static_cast<float>(voxelsToUpdate[testIdx].y()* scale_factor);
-      pt.z = static_cast<float>(voxelsToUpdate[testIdx].z()* scale_factor);
-      cloudS->push_back(pt);
-    }
+    // for (size_t testIdx = 0; testIdx < voxelsToUpdate_size; testIdx = testIdx+1) {
+    //   pcl::PointXYZ pt;
+    //   // query points in world coords but in kilometres rather than metres
+    //   pt.x = static_cast<float>(voxelsToUpdate[testIdx].x()* scale_factor);
+    //   pt.y = static_cast<float>(voxelsToUpdate[testIdx].y()* scale_factor);
+    //   pt.z = static_cast<float>(voxelsToUpdate[testIdx].z()* scale_factor);
+    //   cloudS->push_back(pt);
+    // }
 
     cloudT_ = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
     size_t leafVoxels_size = leafVoxels.size();
@@ -212,176 +212,179 @@ public:
     //std::vector<float> distancesKD;
     int knne = 1; 
 
-    std::vector<int> indicesKD(voxelsToUpdate.size(), -1);
-    std::vector<float> distancesKD(voxelsToUpdate.size(), std::numeric_limits<float>::max());
+    // std::vector<int> indicesKD(voxelsToUpdate.size(), -1);
+    // std::vector<float> distancesKD(voxelsToUpdate.size(), std::numeric_limits<float>::max());
 
     // make the kd tree from gt points
     kdtree_ = std::make_shared<pcl::search::KdTree<pcl::PointXYZ>>();
     // pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
     kdtree_->setInputCloud(cloudT_);
 
-    // iterate through query points
-    for (size_t idxSource = 0; idxSource < voxelsToUpdate_size; idxSource++)
-    {
-      std::vector<int> pointIdxNKNSearch;
-      std::vector<float> pointNKNSquaredDistance;
-      if (kdtree_->nearestKSearch(cloudS->points[idxSource], knne, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
-      {
-        indicesKD[idxSource] = pointIdxNKNSearch[0];
-        // store distances in metres again
-        distancesKD[idxSource] = std::sqrt(pointNKNSquaredDistance[0]);// / scale_factor;
-      }
-    }
-    std::cout << "finish query: " << distancesKD.size() << std::endl;
+    // for testing / sanity check only
+    // // iterate through query points
+    // for (size_t idxSource = 0; idxSource < voxelsToUpdate_size; idxSource++)
+    // {
+    //   std::vector<int> pointIdxNKNSearch;
+    //   std::vector<float> pointNKNSquaredDistance;
+    //   if (kdtree_->nearestKSearch(cloudS->points[idxSource], knne, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
+    //   {
+    //     indicesKD[idxSource] = pointIdxNKNSearch[0];
+    //     // store distances in metres again
+    //     distancesKD[idxSource] = std::sqrt(pointNKNSquaredDistance[0]);// / scale_factor;
+    //   }
+    // }
+    // std::cout << "finish query: " << distancesKD.size() << std::endl;
 
-    // visual the queying distance
-    pcl::PointCloud<pcl::PointXYZI> map_cloud;
-    for (size_t i = 0; i < voxelsToUpdate.size(); i++) {
-      pcl::PointXYZI pt;
-      pt.x = static_cast<float>(voxelsToUpdate[i].x());
-      pt.y = static_cast<float>(voxelsToUpdate[i].y());
-      pt.z = static_cast<float>(voxelsToUpdate[i].z());
-      pt.intensity = static_cast<float>(abs(distancesKD[i]));
-      //std::cout << "pt.intensity: " << pt.intensity << ";" << distancesKD[i] << std::endl;
-      if(std::isnan(abs(distancesKD[i]))|std::isinf(abs(distancesKD[i]))){ // skip points with bad distance
-        continue;
-      }else{
-        map_cloud.push_back(pt);
-      }
-    }
-    auto map_ptr = map_cloud.makeShared();
-    sensor_msgs::msg::PointCloud2::Ptr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
-    pcl::toROSMsg(*map_ptr, *map_msg_ptr);
-    map_msg_ptr->header.frame_id = "map";
-    globalQueryPointsDis_pub_->publish(*map_msg_ptr);
+    // // visual the queying distance
+    // pcl::PointCloud<pcl::PointXYZI> map_cloud;
+    // for (size_t i = 0; i < voxelsToUpdate.size(); i++) {
+    //   pcl::PointXYZI pt;
+    //   pt.x = static_cast<float>(voxelsToUpdate[i].x());
+    //   pt.y = static_cast<float>(voxelsToUpdate[i].y());
+    //   pt.z = static_cast<float>(voxelsToUpdate[i].z());
+    //   pt.intensity = static_cast<float>(abs(distancesKD[i]));
+    //   //std::cout << "pt.intensity: " << pt.intensity << ";" << distancesKD[i] << std::endl;
+    //   if(std::isnan(abs(distancesKD[i]))|std::isinf(abs(distancesKD[i]))){ // skip points with bad distance
+    //     continue;
+    //   }else{
+    //     map_cloud.push_back(pt);
+    //   }
+    // }
+    // auto map_ptr = map_cloud.makeShared();
+    // sensor_msgs::msg::PointCloud2::Ptr map_msg_ptr(new sensor_msgs::msg::PointCloud2);
+    // pcl::toROSMsg(*map_ptr, *map_msg_ptr);
+    // map_msg_ptr->header.frame_id = "map";
+    // globalQueryPointsDis_pub_->publish(*map_msg_ptr);
 
-    // put the distance values in the grid
-    for (size_t i = 0; i < voxelsToUpdate.size(); i++) {
-      openvdb::math::Vec3d centerPoint(voxelsToUpdate[i].x(),voxelsToUpdate[i].y(),voxelsToUpdate[i].z());
-      openvdb::math::Vec3d centerPointI = xformd.worldToIndex(centerPoint);
-      openvdb::math::Coord voxel(centerPointI.x(),centerPointI.y(),centerPointI.z());
-      dis_grid_acc.setValue(voxel,distancesKD[i]);
-    }
+    // // put the distance values in the grid
+    // for (size_t i = 0; i < voxelsToUpdate.size(); i++) {
+    //   openvdb::math::Vec3d centerPoint(voxelsToUpdate[i].x(),voxelsToUpdate[i].y(),voxelsToUpdate[i].z());
+    //   openvdb::math::Vec3d centerPointI = xformd.worldToIndex(centerPoint);
+    //   openvdb::math::Coord voxel(centerPointI.x(),centerPointI.y(),centerPointI.z());
+    //   dis_grid_acc.setValue(voxel,distancesKD[i]);
+    // }
 
-    // Compute the gradient at each voxel using central difference
-    // put the gradient in the grid
-    int indexall = 1;
-    visualization_msgs::msg::MarkerArray mArray;
-    for (int xIdx = -30000; xIdx < 30000; xIdx += interval) {
-      for (int yIdx = -30000; yIdx < 30000; yIdx += interval) {
-          for (int zIdx = -2000; zIdx < 9000; zIdx += interval) {
+    // // Compute the gradient at each voxel using central difference
+    // // put the gradient in the grid
+    // int indexall = 1;
+    // visualization_msgs::msg::MarkerArray mArray;
+    // for (int xIdx = -30000; xIdx < 30000; xIdx += interval) {
+    //   for (int yIdx = -30000; yIdx < 30000; yIdx += interval) {
+    //       for (int zIdx = -2000; zIdx < 9000; zIdx += interval) {
               
-              // Use central difference for gradient approximation
-              openvdb::math::Vec3d centerPoint(xIdx,yIdx,zIdx);
-              openvdb::math::Vec3d centerPointI = xformd.worldToIndex(centerPoint);
-              openvdb::math::Coord voxel0(centerPointI.x(),centerPointI.y(),centerPointI.z());
+    //           // Use central difference for gradient approximation
+    //           openvdb::math::Vec3d centerPoint(xIdx,yIdx,zIdx);
+    //           openvdb::math::Vec3d centerPointI = xformd.worldToIndex(centerPoint);
+    //           openvdb::math::Coord voxel0(centerPointI.x(),centerPointI.y(),centerPointI.z());
 
-              openvdb::math::Vec3d centerPoint1(xIdx+interval,yIdx,zIdx);
-              openvdb::math::Vec3d centerPoint2(xIdx-interval,yIdx,zIdx);
-              openvdb::math::Vec3d centerPoint3(xIdx,yIdx+interval,zIdx);
-              openvdb::math::Vec3d centerPoint4(xIdx,yIdx-interval,zIdx);
-              openvdb::math::Vec3d centerPoint5(xIdx,yIdx,zIdx+interval);
-              openvdb::math::Vec3d centerPoint6(xIdx,yIdx,zIdx-interval);
+    //           openvdb::math::Vec3d centerPoint1(xIdx+interval,yIdx,zIdx);
+    //           openvdb::math::Vec3d centerPoint2(xIdx-interval,yIdx,zIdx);
+    //           openvdb::math::Vec3d centerPoint3(xIdx,yIdx+interval,zIdx);
+    //           openvdb::math::Vec3d centerPoint4(xIdx,yIdx-interval,zIdx);
+    //           openvdb::math::Vec3d centerPoint5(xIdx,yIdx,zIdx+interval);
+    //           openvdb::math::Vec3d centerPoint6(xIdx,yIdx,zIdx-interval);
 
-              openvdb::math::Vec3d centerPointI1 = xformd.worldToIndex(centerPoint1);
-              openvdb::math::Coord voxel1(centerPointI1.x(),centerPointI1.y(),centerPointI1.z());
+    //           openvdb::math::Vec3d centerPointI1 = xformd.worldToIndex(centerPoint1);
+    //           openvdb::math::Coord voxel1(centerPointI1.x(),centerPointI1.y(),centerPointI1.z());
 
-              openvdb::math::Vec3d centerPointI2 = xformd.worldToIndex(centerPoint2);
-              openvdb::math::Coord voxel2(centerPointI2.x(),centerPointI2.y(),centerPointI2.z()); 
+    //           openvdb::math::Vec3d centerPointI2 = xformd.worldToIndex(centerPoint2);
+    //           openvdb::math::Coord voxel2(centerPointI2.x(),centerPointI2.y(),centerPointI2.z()); 
 
-              openvdb::math::Vec3d centerPointI3 = xformd.worldToIndex(centerPoint3);
-              openvdb::math::Coord voxel3(centerPointI3.x(),centerPointI3.y(),centerPointI3.z()); 
+    //           openvdb::math::Vec3d centerPointI3 = xformd.worldToIndex(centerPoint3);
+    //           openvdb::math::Coord voxel3(centerPointI3.x(),centerPointI3.y(),centerPointI3.z()); 
 
-              openvdb::math::Vec3d centerPointI4 = xformd.worldToIndex(centerPoint4);
-              openvdb::math::Coord voxel4(centerPointI4.x(),centerPointI4.y(),centerPointI4.z()); 
+    //           openvdb::math::Vec3d centerPointI4 = xformd.worldToIndex(centerPoint4);
+    //           openvdb::math::Coord voxel4(centerPointI4.x(),centerPointI4.y(),centerPointI4.z()); 
 
-              openvdb::math::Vec3d centerPointI5 = xformd.worldToIndex(centerPoint5);
-              openvdb::math::Coord voxel5(centerPointI5.x(),centerPointI5.y(),centerPointI5.z()); 
+    //           openvdb::math::Vec3d centerPointI5 = xformd.worldToIndex(centerPoint5);
+    //           openvdb::math::Coord voxel5(centerPointI5.x(),centerPointI5.y(),centerPointI5.z()); 
 
-              openvdb::math::Vec3d centerPointI6 = xformd.worldToIndex(centerPoint6);
-              openvdb::math::Coord voxel6(centerPointI6.x(),centerPointI6.y(),centerPointI6.z()); 
+    //           openvdb::math::Vec3d centerPointI6 = xformd.worldToIndex(centerPoint6);
+    //           openvdb::math::Coord voxel6(centerPointI6.x(),centerPointI6.y(),centerPointI6.z()); 
 
-              float dx = (dis_grid_acc.getValue(voxel1) - dis_grid_acc.getValue(voxel2)) / 2*interval;
-              float dy = (dis_grid_acc.getValue(voxel3) - dis_grid_acc.getValue(voxel4)) / 2*interval;
-              float dz = (dis_grid_acc.getValue(voxel5) - dis_grid_acc.getValue(voxel6)) / 2*interval;
+    //           float dx = (dis_grid_acc.getValue(voxel1) - dis_grid_acc.getValue(voxel2)) / 2*interval;
+    //           float dy = (dis_grid_acc.getValue(voxel3) - dis_grid_acc.getValue(voxel4)) / 2*interval;
+    //           float dz = (dis_grid_acc.getValue(voxel5) - dis_grid_acc.getValue(voxel6)) / 2*interval;
 
-              // Store the gradient in Eigen format
-              double gradLen = sqrt(dx*dx + dy*dy + dz*dz); 
+    //           // Store the gradient in Eigen format
+    //           double gradLen = sqrt(dx*dx + dy*dy + dz*dz); 
     
-              if(gradLen != 0){
-                  dx=-dx/gradLen;
-                  dy=-dy/gradLen;
-                  dz=-dz/gradLen;
-              } else {
-                  dx=0;
-                  dy=0;
-                  dz=0;
-              }
-              openvdb::Vec3f gradient(dx, dy, dz);
-              grd_grid_acc.setValue(voxel0, gradient);
+    //           if(gradLen != 0){
+    //               dx=-dx/gradLen;
+    //               dy=-dy/gradLen;
+    //               dz=-dz/gradLen;
+    //           } else {
+    //               dx=0;
+    //               dy=0;
+    //               dz=0;
+    //           }
+    //           openvdb::Vec3f gradient(dx, dy, dz);
+    //           grd_grid_acc.setValue(voxel0, gradient);
               
-              // Optionally, print the gradient for debugging
-              // std::cout << "Distance and Gradient at (" << xIdx << ", " << yIdx << ", " << zIdx << ") : (" 
-              //           << gradient.x() << ", " << gradient.y() << ", " << gradient.z() << ") (" 
-              //           << dis_grid_acc.getValue(voxel0) << ")" << std::endl;
+    //           // Optionally, print the gradient for debugging
+    //           // std::cout << "Distance and Gradient at (" << xIdx << ", " << yIdx << ", " << zIdx << ") : (" 
+    //           //           << gradient.x() << ", " << gradient.y() << ", " << gradient.z() << ") (" 
+    //           //           << dis_grid_acc.getValue(voxel0) << ")" << std::endl;
 
-              // if you dont care about magnitude, normalize the gradient vector (looks better)
-              geometry_msgs::msg::Point start;
-              start.x = xIdx; 
-              start.y = yIdx; 
-              start.z = zIdx;
-              float vecLen1 = 1000; // scales the vector to 1000 ASSUMING it was normalized before
-              geometry_msgs::msg::Point end;
-              end.x = start.x + dx*vecLen1; 
-              end.y = start.y + dy*vecLen1; 
-              end.z = start.z + dz*vecLen1;
-              float colorGra[] = {0,1,1,1}; // RGBA. Calculate a colormap based on distance to color it according to distance field 
-              mArray.markers.push_back(create_arrow(200, start, end, indexall, colorGra));
+    //           // if you dont care about magnitude, normalize the gradient vector (looks better)
+    //           geometry_msgs::msg::Point start;
+    //           start.x = xIdx; 
+    //           start.y = yIdx; 
+    //           start.z = zIdx;
+    //           float vecLen1 = 1000; // scales the vector to 1000 ASSUMING it was normalized before
+    //           geometry_msgs::msg::Point end;
+    //           end.x = start.x + dx*vecLen1; 
+    //           end.y = start.y + dy*vecLen1; 
+    //           end.z = start.z + dz*vecLen1;
+    //           float colorGra[] = {0,1,1,1}; // RGBA. Calculate a colormap based on distance to color it according to distance field 
+    //           mArray.markers.push_back(create_arrow(200, start, end, indexall, colorGra));
 
-              indexall ++;
-          }
-      }
-    } 
-    globalQueryPointsGrd_pub_->publish(mArray);
+    //           indexall ++;
+    //       }
+    //   }
+    // } 
+    // globalQueryPointsGrd_pub_->publish(mArray);
 
-    // Create a VDB file
-    openvdb::io::File file1("raw_grid.vdb");
+    // // Create a VDB file
+    // openvdb::io::File file1("raw_grid.vdb");
 
-    // Create a grid vector and add our grid
-    openvdb::GridPtrVec rawgrids;
-    rawgrids.push_back(raw_grid_);
+    // // Create a grid vector and add our grid
+    // openvdb::GridPtrVec rawgrids;
+    // rawgrids.push_back(raw_grid_);
 
-    // Write the grids to the file
-    file1.write(rawgrids);
-    file1.close();
+    // // Write the grids to the file
+    // file1.write(rawgrids);
+    // file1.close();
     
-    // Create a VDB file
-    openvdb::io::File file2("dis_grid.vdb");
+    // // Create a VDB file
+    // openvdb::io::File file2("dis_grid.vdb");
 
-    // Create a grid vector and add our grid
-    openvdb::GridPtrVec disgrids;
-    disgrids.push_back(dis_grid_);
+    // // Create a grid vector and add our grid
+    // openvdb::GridPtrVec disgrids;
+    // disgrids.push_back(dis_grid_);
 
-    // Write the grids to the file
-    file2.write(disgrids);
-    file2.close();
+    // // Write the grids to the file
+    // file2.write(disgrids);
+    // file2.close();
 
-    // Create a VDB file
-    openvdb::io::File file3("grd_grid.vdb");
+    // // Create a VDB file
+    // openvdb::io::File file3("grd_grid.vdb");
 
-    // Create a grid vector and add our grid
-    openvdb::GridPtrVec grdgrids;
-    grdgrids.push_back(grd_grid_);
+    // // Create a grid vector and add our grid
+    // openvdb::GridPtrVec grdgrids;
+    // grdgrids.push_back(grd_grid_);
 
-    // Write the grids to the file
-    file3.write(grdgrids);
-    file3.close();
+    // // Write the grids to the file
+    // file3.write(grdgrids);
+    // file3.close();
 
-    std::cout << "Saved all VDB files: raw_grid.vdb, dis_grid.vdb, grd_grid.vdb" << std::endl;
+    // std::cout << "Saved all VDB files: raw_grid.vdb, dis_grid.vdb, grd_grid.vdb" << std::endl;
     
     // Start service
     query_edf_srv_ = this->create_service<edf_srv::srv::QueryEdf>("edf_srv", 
                                                                   std::bind(&MinimalSubscriber::queryEDF_callback, this, _1,_2));
+    slice_edf_srv_ = this->create_service<edf_srv::srv::QueryEdfSlice>("slice_edf_srv",
+                                                                  std::bind(&MinimalSubscriber::queryEDF_slice, this, _1,_2));
   }
 
 private:
@@ -395,6 +398,68 @@ private:
     ros_cloud_out.header.frame_id = "map";
     publisherOut_->publish(ros_cloud_out);
   }
+
+  void queryEDF_slice(
+    const std::shared_ptr<edf_srv::srv::QueryEdfSlice::Request> reqQ,
+    std::shared_ptr<edf_srv::srv::QueryEdfSlice::Response> resS)  {
+      // generate a queyring cube in the space
+      int interval = 100; // make this interval as 100 or 200 to have the full distance field and gradients
+      std::vector<Eigen::Vector3d> voxelsToUpdate;
+      for(double xIdx = -30000; xIdx < 30000; xIdx = xIdx + interval){
+        for(double yIdx = -30000; yIdx < 30000; yIdx = yIdx + interval){
+          // for(double zIdx = -2000; zIdx < 9000; zIdx = zIdx + interval){
+            Eigen::Vector3d tmp(xIdx,yIdx,reqQ->z);
+            // vector of query points in world coordinates
+            voxelsToUpdate.push_back(tmp);
+          }
+        }
+      pcl::PointCloud<pcl::PointXYZ>::Ptr cloudS(new pcl::PointCloud<pcl::PointXYZ>);
+      size_t voxelsToUpdate_size = voxelsToUpdate.size();
+      resS->distances.resize(voxelsToUpdate_size,0);
+    // // Scale factor to avoid floating-point precision issues
+      double scale_factor = 100;  // Convert meters to kilometers (or adjust as needed)
+      for (size_t testIdx = 0; testIdx < voxelsToUpdate_size; testIdx = testIdx+1) {
+        pcl::PointXYZ pt;
+        // query points in world coords but in kilometres rather than metres
+        pt.x = static_cast<float>(voxelsToUpdate[testIdx].x()* scale_factor);
+        pt.y = static_cast<float>(voxelsToUpdate[testIdx].y()* scale_factor);
+        pt.z = static_cast<float>(voxelsToUpdate[testIdx].z()* scale_factor);
+        cloudS->push_back(pt);
+      }
+
+      std::vector<int> indicesKD(voxelsToUpdate.size(), -1);
+      std::vector<float> distancesKD(voxelsToUpdate.size(), std::numeric_limits<float>::max());
+
+      for (size_t idxSource = 0; idxSource < voxelsToUpdate_size; idxSource++)
+      {
+        std::vector<int> pointIdxNKNSearch;
+        std::vector<float> pointNKNSquaredDistance;
+        if (kdtree_->nearestKSearch(cloudS->points[idxSource], knne, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)
+        {
+          indicesKD[idxSource] = pointIdxNKNSearch[0];
+          // store distances in metres again
+          distancesKD[idxSource] = std::sqrt(pointNKNSquaredDistance[0]) / scale_factor;
+        }
+      }
+      std::cout << "finish query: " << distancesKD.size() << std::endl;
+
+      // visual the queying distance
+      pcl::PointCloud<pcl::PointXYZI> map_cloud;
+      for (size_t i = 0; i < voxelsToUpdate.size(); i++) {
+        pcl::PointXYZI pt;
+        pt.x = static_cast<float>(voxelsToUpdate[i].x());
+        pt.y = static_cast<float>(voxelsToUpdate[i].y());
+        pt.z = static_cast<float>(voxelsToUpdate[i].z());
+        pt.intensity = static_cast<float>(abs(distancesKD[i]));
+        //std::cout << "pt.intensity: " << pt.intensity << ";" << distancesKD[i] << std::endl;
+        if(std::isnan(abs(distancesKD[i]))|std::isinf(abs(distancesKD[i]))){ // skip points with bad distance
+          continue;
+        }else{
+          resS->distances[i] = pt;
+        }
+      }
+      visualQueriedDistances(voxelsToUpdate,resS->distances);
+    }
 
   void queryEDF_callback(
     const std::shared_ptr<edf_srv::srv::QueryEdf::Request> reqQ,
@@ -584,6 +649,7 @@ private:
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr globalQueryPointsGrd_pub_;
 
   rclcpp::Service<edf_srv::srv::QueryEdf>::SharedPtr query_edf_srv_;
+  rclcpp::Service<edf_srv::srv::QueryEdfSlice>::SharedPtr slice_edf_srv_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 
