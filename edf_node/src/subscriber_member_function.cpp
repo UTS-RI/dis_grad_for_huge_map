@@ -214,6 +214,7 @@ private:
       pcl::PointCloud<pcl::PointXYZ>::Ptr cloudS(new pcl::PointCloud<pcl::PointXYZ>);
       size_t voxelsToUpdate_size = voxelsToUpdate.size();
       resS->distances.resize(voxelsToUpdate_size,0);
+      int knne = 1; 
     // // Scale factor to avoid floating-point precision issues
       double scale_factor = 100;  // Convert meters to kilometers (or adjust as needed)
       for (size_t testIdx = 0; testIdx < voxelsToUpdate_size; testIdx = testIdx+1) {

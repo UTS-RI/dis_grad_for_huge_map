@@ -47,7 +47,7 @@ add_executable(edf_service src/subscriber_member_function.cpp)
 ament_target_dependencies(edf_service rclcpp std_msgs rclcpp sensor_msgs pcl_conversions PCL visualization_msgs edf_srv)
 
 install(TARGETS
-  talker
+  # talker
   edf_service
   DESTINATION lib/${PROJECT_NAME})
 
