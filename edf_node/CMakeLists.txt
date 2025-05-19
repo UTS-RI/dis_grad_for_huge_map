@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(sydney_edf_map)
+project(edf_map)
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
@@ -52,6 +52,6 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME})
 
 # add_library(ongpdf_lib src/OnGPDF.cpp)
-# target_link_libraries(listener ${OpenVDB_LIBRARIES} ${catkin_LIBRARIES} ongpdf_lib)
+target_link_libraries(edf_service ${OpenVDB_LIBRARIES} ${catkin_LIBRARIES})
 
 ament_package()
